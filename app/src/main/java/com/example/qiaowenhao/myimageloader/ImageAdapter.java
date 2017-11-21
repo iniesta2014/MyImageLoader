@@ -28,6 +28,7 @@ import java.net.URL;
 public class ImageAdapter extends ArrayAdapter {
     private ListView mListView;
     private Bitmap mLoadingBitmap;
+    private LruCache<String, BitmapDrawable> mMemoryCache;
 
     @NonNull
     @Override
@@ -48,7 +49,7 @@ public class ImageAdapter extends ArrayAdapter {
         if (drawable != null) {
             image.setImageDrawable(drawable);
         } else if (cancelPotentialWork(url, image)) {
-            BitMapWorkerTask task = new BitMapWorkerTask(image);
+            BitmapWorkerTask task = new BitMapWorkerTask(image);
             AsyncDrawable asyncDrawable = new AsyncDrawable(getContext().getResources(), )
         }
         return view;
@@ -74,10 +75,11 @@ public class ImageAdapter extends ArrayAdapter {
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
         int cacheSize = maxMemory / 8;
         mMemoryCache = new LruCache<String, BitmapDrawable>(cacheSize) {
-                @Override
-                protected int sizeOf(String key, BitmapDrawable value) {
-                    return value.getBitmap().getByteCount();
-                };
+            @Override
+            protected int sizeOf(String key, BitmapDrawable value) {
+                return value.getBitmap().getByteCount();
+            }
+        };
     }
 
     class BitMapWorkerTask extends AsyncTask<String, Void, BitmapDrawable> {
