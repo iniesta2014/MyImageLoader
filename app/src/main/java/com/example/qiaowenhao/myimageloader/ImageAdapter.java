@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.ListView;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -23,10 +24,12 @@ import java.net.URL;
 
 public class ImageAdapter extends ArrayAdapter {
     private LruCache<String, BitmapDrawable> mMemoryCache;
+    private ListView mListView;
 
     @NonNull
     @Override
     public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+        mListView = (ListView) parent;
         String url = (String) getItem(position);
         View view;
         if (convertView == null) {
@@ -37,10 +40,12 @@ public class ImageAdapter extends ArrayAdapter {
 
         ImageView image = view.findViewById(R.id.image);
         BitmapDrawable drawable = getBitMapFromCache(url);
+        image.setImageResource(R.drawable.default_icon);
+        image.setTag(url);
         if (drawable != null) {
             image.setImageDrawable(drawable);
         } else {
-            new BitMapWorkerTask(image).execute(url);
+            new BitMapWorkerTask().execute(url);
         }
         return view;
     }
@@ -68,18 +73,19 @@ public class ImageAdapter extends ArrayAdapter {
     }
 
     class BitMapWorkerTask extends AsyncTask<String, Void, BitmapDrawable> {
-        private ImageView mImageView;
+        String imageUrl;
 
         @Override
         protected void onPostExecute(BitmapDrawable drawable) {
-            if (mImageView != null && drawable != null) {
-                mImageView.setImageDrawable(drawable);
+            ImageView imageView = mListView.findViewWithTag(imageUrl);
+            if (imageView != null && drawable != null) {
+                imageView.setImageDrawable(drawable);
             }
         }
 
         @Override
         protected BitmapDrawable doInBackground(String... strings) {
-            String imageUrl = strings[0];
+            imageUrl = strings[0];
             Bitmap bitmap = downLoadBitmap(imageUrl);
             BitmapDrawable drawable = new BitmapDrawable(getContext().getResources(), bitmap);
             addBitMapFromCache(imageUrl, drawable);
@@ -101,10 +107,6 @@ public class ImageAdapter extends ArrayAdapter {
                 }
             }
             return bitmap;
-        }
-
-        public BitMapWorkerTask(ImageView imageView) {
-            mImageView = imageView;
         }
     }
 
