@@ -44,19 +44,30 @@ public class ImageAdapter extends ArrayAdapter {
 
         ImageView image = view.findViewById(R.id.image);
         BitmapDrawable drawable = getBitMapFromCache(url);
-        image.setImageResource(R.drawable.default_icon);
         image.setTag(url);
         if (drawable != null) {
             image.setImageDrawable(drawable);
         } else if (cancelPotentialWork(url, image)) {
-            BitmapWorkerTask task = new BitMapWorkerTask(image);
-            AsyncDrawable asyncDrawable = new AsyncDrawable(getContext().getResources(), )
+            BitMapWorkerTask task = new BitMapWorkerTask(image);
+            AsyncDrawable asyncDrawable = new AsyncDrawable(getContext().getResources(),
+                    mLoadingBitmap, task);
+            image.setImageDrawable(asyncDrawable);
+            task.execute(url);
         }
         return view;
     }
 
     private boolean cancelPotentialWork(String url, ImageView image) {
-
+        BitMapWorkerTask bitMapWorkerTask = getBitmapWorkerTask(image);
+        if (bitMapWorkerTask != null) {
+            String imageUrl = bitMapWorkerTask.imageUrl;
+            if (imageUrl == null || !imageUrl.equals(url)) {
+                bitMapWorkerTask.cancel(true);
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     private BitmapDrawable getBitMapFromCache(String key) {
