@@ -1,9 +1,11 @@
 package com.example.qiaowenhao.myimageloader;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -15,6 +17,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 
+import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -23,8 +26,8 @@ import java.net.URL;
  */
 
 public class ImageAdapter extends ArrayAdapter {
-    private LruCache<String, BitmapDrawable> mMemoryCache;
     private ListView mListView;
+    private Bitmap mLoadingBitmap;
 
     @NonNull
     @Override
@@ -44,10 +47,15 @@ public class ImageAdapter extends ArrayAdapter {
         image.setTag(url);
         if (drawable != null) {
             image.setImageDrawable(drawable);
-        } else {
-            new BitMapWorkerTask().execute(url);
+        } else if (cancelPotentialWork(url, image)) {
+            BitMapWorkerTask task = new BitMapWorkerTask(image);
+            AsyncDrawable asyncDrawable = new AsyncDrawable(getContext().getResources(), )
         }
         return view;
+    }
+
+    private boolean cancelPotentialWork(String url, ImageView image) {
+
     }
 
     private BitmapDrawable getBitMapFromCache(String key) {
@@ -62,25 +70,39 @@ public class ImageAdapter extends ArrayAdapter {
 
     public ImageAdapter(@NonNull Context context, int resource, @NonNull Object[] objects) {
         super(context, resource, objects);
+        mLoadingBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.default_icon);
         int maxMemory = (int) Runtime.getRuntime().maxMemory();
         int cacheSize = maxMemory / 8;
-        mMemoryCache = new LruCache<String, BitmapDrawable>(cacheSize){
-            @Override
-            protected int sizeOf(String key, BitmapDrawable value) {
-                return value.getBitmap().getByteCount();
-            }
-        };
+        mMemoryCache = new LruCache<String, BitmapDrawable>(cacheSize) {
+                @Override
+                protected int sizeOf(String key, BitmapDrawable value) {
+                    return value.getBitmap().getByteCount();
+                };
     }
 
     class BitMapWorkerTask extends AsyncTask<String, Void, BitmapDrawable> {
         String imageUrl;
+        private WeakReference<ImageView> imageViewWeakReference;
+
+        public BitMapWorkerTask(ImageView imageView) {
+            imageViewWeakReference = new WeakReference<ImageView>(imageView);
+        }
 
         @Override
         protected void onPostExecute(BitmapDrawable drawable) {
-            ImageView imageView = mListView.findViewWithTag(imageUrl);
+            ImageView imageView = getAttachedImageView();
             if (imageView != null && drawable != null) {
                 imageView.setImageDrawable(drawable);
             }
+        }
+
+        private ImageView getAttachedImageView() {
+            ImageView imageView = imageViewWeakReference.get();
+            BitMapWorkerTask bitMapWorkerTask = getBitmapWorkerTask(imageView);
+            if (this == bitMapWorkerTask) {
+                return imageView;
+            }
+            return null;
         }
 
         @Override
@@ -110,4 +132,27 @@ public class ImageAdapter extends ArrayAdapter {
         }
     }
 
+    private BitMapWorkerTask getBitmapWorkerTask(ImageView imageView) {
+        if (imageView != null) {
+            Drawable drawable = imageView.getDrawable();
+            if (drawable instanceof AsyncDrawable) {
+                AsyncDrawable asyncDrawable = (AsyncDrawable) drawable;
+                return asyncDrawable.getBitmapWorkerTask();
+            }
+        }
+        return null;
+    }
+
+    private class AsyncDrawable extends BitmapDrawable {
+        private WeakReference<BitMapWorkerTask> bitMapWorkerTaskWeakReference;
+
+        public AsyncDrawable(Resources res, Bitmap bitmap, BitMapWorkerTask bitMapWorkerTask) {
+            super(res, bitmap);
+            this.bitMapWorkerTaskWeakReference = new WeakReference<BitMapWorkerTask>(
+                    bitMapWorkerTask);
+        }
+        public BitMapWorkerTask getBitmapWorkerTask() {
+            return bitMapWorkerTaskWeakReference.get();
+        }
+    }
 }
